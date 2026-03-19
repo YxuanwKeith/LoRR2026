@@ -1,0 +1,12 @@
+{
+    "actionModel": "MAPF_T",
+    "version": "2026 LoRR",
+    "teamSize": 500,
+    "numTaskFinished": 491,
+    "makespan": 10000,
+    "numPlannerErrors": 0,
+    "numScheduleErrors": 0,
+    "numEntryTimeouts": 0,
+    "agentMaxCounter": 10,
+    "outputSegmentSize": 100
+}

@@ -5,8 +5,36 @@
 #include "nlohmann/json.hpp"
 #include <functional>
 #include <Logger.h>
+#include <fstream>
 
 using json = nlohmann::ordered_json;
+
+namespace {
+
+void append_progress_line(const std::string& file_path, int timestep, int finished_tasks)
+{
+    if (file_path.empty())
+    {
+        return;
+    }
+
+    std::ofstream progress(file_path, std::ios::app);
+    progress << "timestep=" << timestep << ", numTaskFinished=" << finished_tasks << std::endl;
+}
+
+}
+
+
+void BaseSystem::set_progress_monitor(int interval, const std::string& file_path)
+{
+    progress_interval = interval;
+    next_progress_timestep = interval > 0 ? interval : 0;
+    progress_file_path = file_path;
+    if (!progress_file_path.empty())
+    {
+        std::ofstream(progress_file_path, std::ios::trunc);
+    }
+}
 
 
 void BaseSystem::sync_shared_env() 
@@ -200,6 +228,16 @@ void BaseSystem::simulate(int simulation_time, int chunk_size)
 
         //update tasks
         task_manager.update_tasks(curr_states, proposed_schedule, simulator.get_curr_timestep());
+
+        if (progress_interval > 0)
+        {
+            const int current_timestep = simulator.get_curr_timestep();
+            while (current_timestep >= next_progress_timestep && next_progress_timestep > 0)
+            {
+                append_progress_line(progress_file_path, current_timestep, task_manager.num_of_task_finish);
+                next_progress_timestep += progress_interval;
+            }
+        }
     }
 }
 

@@ -2,8 +2,20 @@
 #include "Tasks.h"
 #include "nlohmann/json.hpp"
 #include <vector>
+#include <unordered_map>
 
 using json = nlohmann::ordered_json;
+
+namespace {
+
+Task* find_ongoing_task(const std::unordered_map<int, Task*>& ongoing_tasks, int task_id)
+{
+    auto it = ongoing_tasks.find(task_id);
+    return it == ongoing_tasks.end() ? nullptr : it->second;
+}
+
+} // namespace
+
 
 /**
  * This function validates the proposed schedule (assignment) from participants
@@ -97,8 +109,17 @@ bool TaskManager::set_task_assignment(vector< int>& assignment)
     //reset all the agent_assigned to -1, so that any droped task->agent_assignment will be -1
     for (int a = 0; a < assignment.size(); a++)
     {
-        if (current_assignment[a] >= 0){
-            ongoing_tasks[current_assignment[a]]->agent_assigned = -1;
+        if (current_assignment[a] < 0)
+        {
+            continue;
+        }
+        if (Task* task = find_ongoing_task(ongoing_tasks, current_assignment[a]))
+        {
+            task->agent_assigned = -1;
+        }
+        else
+        {
+            current_assignment[a] = -1;
         }
     }
 
@@ -106,12 +127,22 @@ bool TaskManager::set_task_assignment(vector< int>& assignment)
     for (int a = 0; a < assignment.size(); a++)
     {
         int t_id = assignment[a];
-        current_assignment[a] = t_id;
-        if (assignment[a] < 0)
+        if (t_id < 0)
         {
+            current_assignment[a] = -1;
             continue;
         }
-        ongoing_tasks[t_id]->agent_assigned = a;
+
+        Task* task = find_ongoing_task(ongoing_tasks, t_id);
+        if (task == nullptr)
+        {
+            assignment[a] = -1;
+            current_assignment[a] = -1;
+            continue;
+        }
+
+        current_assignment[a] = t_id;
+        task->agent_assigned = a;
     }
 
     for (int a = 0; a < current_assignment.size(); a++)
@@ -138,9 +169,20 @@ list<int> TaskManager::check_finished_tasks(vector<State>& states, int timestep)
     //new_freeagents.clear(); //prepare to push all new free agents to the shared environment
     for (int k = 0; k < num_of_agents; k++)
     {
-        if (current_assignment[k] != -1 && states[k].location == ongoing_tasks[current_assignment[k]]->get_next_loc())
+        if (current_assignment[k] == -1)
         {
-            Task * task = ongoing_tasks[current_assignment[k]];
+            continue;
+        }
+
+        Task* task = find_ongoing_task(ongoing_tasks, current_assignment[k]);
+        if (task == nullptr)
+        {
+            current_assignment[k] = -1;
+            continue;
+        }
+
+        if (states[k].location == task->get_next_loc())
+        {
             task->idx_next_loc += 1;
 
             if (task->is_finished())

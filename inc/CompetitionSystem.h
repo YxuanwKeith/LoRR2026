@@ -74,6 +74,7 @@ public:
 
     //void saveSimulationIssues(const string &fileName) const;
     void saveResults(const string &fileName, int screen, bool pretty_print = false) const;
+    void set_progress_monitor(int interval, const std::string& file_path);
 
 
 protected:
@@ -84,6 +85,9 @@ protected:
     vector<int> proposed_schedule;
 
     int total_timetous = 0;
+    int progress_interval = 0;
+    int next_progress_timestep = 0;
+    std::string progress_file_path;
 
 
     std::future<bool> future;
