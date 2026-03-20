@@ -108,7 +108,7 @@ const TaskScoringConfig& get_task_scoring_config()
 {
     if (!g_task_scoring_config_loaded)
     {
-        g_task_scoring_config.enabled = parse_env_flag("LORR_ENABLE_TASK_SCORING", false);
+        g_task_scoring_config.enabled = parse_env_flag("LORR_ENABLE_TASK_SCORING", true);
         g_task_scoring_config.length_bonus = parse_env_double("LORR_TASK_SCORE_LENGTH_BONUS", 0.45);
         g_task_scoring_config.bypass_bonus = parse_env_double("LORR_TASK_SCORE_BYPASS_BONUS", 0.35);
         g_task_scoring_config.density_penalty = parse_env_double("LORR_TASK_SCORE_DENSITY_PENALTY", 0.80);
