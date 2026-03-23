@@ -74,7 +74,6 @@ public:
 
     //void saveSimulationIssues(const string &fileName) const;
     void saveResults(const string &fileName, int screen, bool pretty_print = false) const;
-    void set_progress_monitor(int interval, const std::string& file_path);
 
 
 protected:
@@ -85,9 +84,6 @@ protected:
     vector<int> proposed_schedule;
 
     int total_timetous = 0;
-    int progress_interval = 0;
-    int next_progress_timestep = 0;
-    std::string progress_file_path;
 
 
     std::future<bool> future;
@@ -120,6 +116,18 @@ protected:
     vector<int> solution_costs;
     list<double> planner_times; 
     bool fast_mover_feasible = true;
+
+    // ---- Timing 统计（用于 benchmark 输出） ----
+    double init_time_ms_ = 0.0;               // 初始化用时 (ms)
+    double first_schedule_ms_ = 0.0;          // 第一轮任务分配用时 (ms)
+    double first_plan_ms_ = 0.0;              // 第一轮路径规划用时 (ms)
+    double total_schedule_ms_ = 0.0;          // 所有轮次任务分配总用时 (ms)
+    double total_plan_ms_ = 0.0;              // 所有轮次路径规划总用时 (ms)
+    int    plan_call_count_ = 0;              // plan 调用次数
+    double total_tick_plan_ms_ = 0.0;         // 每个 tick 的规划耗时累计
+    int    tick_count_ = 0;                   // tick 计数
+
+    void print_timing_summary() const;
 
 
     void initialize();

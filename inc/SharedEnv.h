@@ -48,5 +48,9 @@ public:
     int action_time; // information of the time for executing each action, in milliseconds. 
     int max_counter; // information of the max counter value for agents, which is the number of time ticks that agents have to spend to finish one action
 
+    // ---- Timing 报告字段（由 Entry::compute 填写，供 CompetitionSystem 读取） ----
+    double last_schedule_ms = 0.0;  // 上一次 compute 中任务分配耗时 (ms)
+    double last_plan_ms = 0.0;      // 上一次 compute 中路径规划耗时 (ms)
+
     SharedEnvironment(){}
 };

@@ -1,13 +1,7 @@
-cmake_minimum_required(VERSION 3.16)
 project(lifelong)
 
-if(POLICY CMP0167)
-    cmake_policy(SET CMP0167 OLD)
-endif()
-
+cmake_minimum_required(VERSION 3.16)
 set(CMAKE_CXX_STANDARD 17)
-
-
 
 # Set the default value of PYTHON to false
 option(PYTHON "Enable Python" OFF)
@@ -34,19 +28,17 @@ include_directories("inc")
 # default planner
 include_directories("default_planner")
 
-file(GLOB SOURCES "src/*.cpp" "default_planner/*.cpp")
+# optsvr: 自定义优化模块
+include_directories("optsvr")
+
+file(GLOB SOURCES "src/*.cpp" "default_planner/*.cpp" "optsvr/*.cpp")
 file(GLOB DEFAULT_PLANNER_SOURCES "default_planner/*.cpp")
-set(TASK_ASSIGNMENT_SOURCES
-    src/task_assignment.cpp
-)
 
 
 # Find Boost
 ADD_DEFINITIONS(-DBOOST_LOG_DYN_LINK)
-set(Boost_NO_BOOST_CMAKE ON)
 #SET(Boost_USE_STATIC_LIBS ON)
-find_package(Boost 1.49.0 MODULE REQUIRED COMPONENTS program_options filesystem log log_setup)
-
+find_package( Boost 1.49.0 REQUIRED COMPONENTS program_options filesystem log log_setup)
 
 include_directories( ${Boost_INCLUDE_DIRS} )
 
@@ -122,33 +114,5 @@ if(BUILD_TESTS)
     )
     target_link_libraries(delay_generator_test ${Boost_LIBRARIES})
     add_test(NAME delay_generator_test COMMAND delay_generator_test)
-
-    add_executable(task_assignment_test
-        tests/task_assignment_test.cpp
-        src/TaskScheduler.cpp
-        ${TASK_ASSIGNMENT_SOURCES}
-        ${DEFAULT_PLANNER_SOURCES}
-    )
-    target_link_libraries(task_assignment_test ${Boost_LIBRARIES})
-    add_test(NAME task_assignment_test COMMAND task_assignment_test)
-
-    add_executable(task_scheduler_reassign_test
-        tests/task_scheduler_reassign_test.cpp
-        src/TaskScheduler.cpp
-        ${TASK_ASSIGNMENT_SOURCES}
-        ${DEFAULT_PLANNER_SOURCES}
-    )
-    target_link_libraries(task_scheduler_reassign_test ${Boost_LIBRARIES})
-    add_test(NAME task_scheduler_reassign_test COMMAND task_scheduler_reassign_test)
-
-    add_executable(executor_tpg_test
-        tests/executor_tpg_test.cpp
-        src/Executor.cpp
-        src/common.cpp
-    )
-    target_include_directories(executor_tpg_test PRIVATE inc src default_planner)
-    target_link_libraries(executor_tpg_test ${Boost_LIBRARIES})
-    add_test(NAME executor_tpg_test COMMAND executor_tpg_test)
 endif()
-
 

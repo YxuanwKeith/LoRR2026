@@ -1,12 +1,14 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
 
-mkdir -p build
+mkdir build
 
 # build exec for cpp
-cmake -S . -B build -DPYTHON=false -DCMAKE_BUILD_TYPE=Release
-cmake --build build --parallel
+
+cmake -B build ./ -DPYTHON=false -DCMAKE_BUILD_TYPE=Release
+make -C build -j
+
 
 # build exec for python
-# cmake -S . -B build -DPYTHON=true -DCMAKE_BUILD_TYPE=Release
-# cmake --build build --parallel
+
+# cmake -B build ./ -DPYTHON=true -DCMAKE_BUILD_TYPE=Release
+# make -C build -j

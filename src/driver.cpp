@@ -61,8 +61,6 @@ int main(int argc, char **argv)
         ("planCommTimeLimit,t", po::value<int>()->default_value(1000), "the minimal communication time limit for planner in milliseconds")
         ("outputActionWindow,w", po::value<int>()->default_value(100), "output results from the evaluation into a JSON formated file. If no file specified, the default name is 'output.json'")
         ("executorProcessPlanTimeLimit,x", po::value<int>()->default_value(100), "the time limit for process new plan in milliseconds")
-        ("progressInterval", po::value<int>()->default_value(0), "append progress every N timesteps; 0 disables progress output")
-        ("progressFile", po::value<std::string>()->default_value(""), "append progress lines to the specified file")
         ;
     clock_t start_time = clock();
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -185,7 +183,6 @@ int main(int argc, char **argv)
     system_ptr->set_logger(logger);
     system_ptr->set_plan_time_limit(vm["initialPlanTimeLimit"].as<int>(),vm["planCommTimeLimit"].as<int>(),vm["actionMoveTimeLimit"].as<int>(),vm["executorProcessPlanTimeLimit"].as<int>());
     system_ptr->set_preprocess_time_limit(vm["preprocessTimeLimit"].as<int>());
-    system_ptr->set_progress_monitor(vm["progressInterval"].as<int>(), vm["progressFile"].as<std::string>());
 
     system_ptr->set_num_tasks_reveal(read_param_json<float>(data, "numTasksReveal", 1));
 

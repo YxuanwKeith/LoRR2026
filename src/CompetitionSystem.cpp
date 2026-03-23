@@ -5,36 +5,9 @@
 #include "nlohmann/json.hpp"
 #include <functional>
 #include <Logger.h>
-#include <fstream>
+#include <iomanip>
 
 using json = nlohmann::ordered_json;
-
-namespace {
-
-void append_progress_line(const std::string& file_path, int timestep, int finished_tasks)
-{
-    if (file_path.empty())
-    {
-        return;
-    }
-
-    std::ofstream progress(file_path, std::ios::app);
-    progress << "timestep=" << timestep << ", numTaskFinished=" << finished_tasks << std::endl;
-}
-
-}
-
-
-void BaseSystem::set_progress_monitor(int interval, const std::string& file_path)
-{
-    progress_interval = interval;
-    next_progress_timestep = interval > 0 ? interval : 0;
-    progress_file_path = file_path;
-    if (!progress_file_path.empty())
-    {
-        std::ofstream(progress_file_path, std::ios::trunc);
-    }
-}
 
 
 void BaseSystem::sync_shared_env() 
@@ -137,6 +110,12 @@ void BaseSystem::simulate(int simulation_time, int chunk_size)
         started = false;
         auto res = future.get();
         logger->log_info("planner returns", timestep);
+        // 记录第一轮 timing
+        first_schedule_ms_ = env->last_schedule_ms;
+        first_plan_ms_ = env->last_plan_ms;
+        total_schedule_ms_ += env->last_schedule_ms;
+        total_plan_ms_ += env->last_plan_ms;
+        plan_call_count_++;
     }
     else
     {
@@ -166,6 +145,14 @@ void BaseSystem::simulate(int simulation_time, int chunk_size)
             started = false;
             auto res = future.get();
             logger->log_info("planner returns", timestep);
+            // 记录第一轮 timing（延迟完成）
+            if (plan_call_count_ == 0) {
+                first_schedule_ms_ = env->last_schedule_ms;
+                first_plan_ms_ = env->last_plan_ms;
+            }
+            total_schedule_ms_ += env->last_schedule_ms;
+            total_plan_ms_ += env->last_plan_ms;
+            plan_call_count_++;
         } 
         else 
         {
@@ -180,6 +167,8 @@ void BaseSystem::simulate(int simulation_time, int chunk_size)
     while (simulator.get_curr_timestep() < simulation_time)
     {
         timestep = simulator.get_curr_timestep();
+        auto tick_start = std::chrono::steady_clock::now();
+
         //check if planenr finished
         if (remain_communication_time <= 0 && started)
         {
@@ -191,6 +180,9 @@ void BaseSystem::simulate(int simulation_time, int chunk_size)
                 started = false;
                 auto res = future.get();
                 logger->log_info("planner returns", timestep);
+                total_schedule_ms_ += env->last_schedule_ms;
+                total_plan_ms_ += env->last_plan_ms;
+                plan_call_count_++;
             } 
             else 
             {
@@ -229,16 +221,14 @@ void BaseSystem::simulate(int simulation_time, int chunk_size)
         //update tasks
         task_manager.update_tasks(curr_states, proposed_schedule, simulator.get_curr_timestep());
 
-        if (progress_interval > 0)
-        {
-            const int current_timestep = simulator.get_curr_timestep();
-            while (current_timestep >= next_progress_timestep && next_progress_timestep > 0)
-            {
-                append_progress_line(progress_file_path, current_timestep, task_manager.num_of_task_finish);
-                next_progress_timestep += progress_interval;
-            }
-        }
+        // 统计每 tick 耗时
+        auto tick_end = std::chrono::steady_clock::now();
+        total_tick_plan_ms_ += std::chrono::duration<double, std::milli>(tick_end - tick_start).count();
+        tick_count_++;
     }
+
+    // 输出 timing 汇总
+    print_timing_summary();
 }
 
 
@@ -279,6 +269,8 @@ void BaseSystem::initialize()
     {
         init_td.join();
         log_preprocessing(true);
+        auto actual_init_end = std::chrono::steady_clock::now();
+        init_time_ms_ = std::chrono::duration<double, std::milli>(actual_init_end - init_start_time).count();
     } 
     else 
     {
@@ -466,4 +458,23 @@ void BaseSystem::saveResults(const string &fileName, int screen, bool pretty_pri
         f << js.dump();
     }
 
+}
+
+void BaseSystem::print_timing_summary() const
+{
+    double avg_schedule = plan_call_count_ > 0 ? total_schedule_ms_ / plan_call_count_ : 0.0;
+    double avg_plan     = plan_call_count_ > 0 ? total_plan_ms_ / plan_call_count_ : 0.0;
+    double avg_tick     = tick_count_ > 0 ? total_tick_plan_ms_ / tick_count_ : 0.0;
+
+    std::cerr << "\n===== TIMING SUMMARY =====\n";
+    std::cerr << "[TIMING] tasks_finished=" << task_manager.num_of_task_finish << "\n";
+    std::cerr << "[TIMING] init_ms=" << std::fixed << std::setprecision(1) << init_time_ms_ << "\n";
+    std::cerr << "[TIMING] first_schedule_ms=" << first_schedule_ms_ << "\n";
+    std::cerr << "[TIMING] first_plan_ms=" << first_plan_ms_ << "\n";
+    std::cerr << "[TIMING] avg_schedule_ms=" << avg_schedule << "\n";
+    std::cerr << "[TIMING] avg_plan_ms=" << avg_plan << "\n";
+    std::cerr << "[TIMING] avg_tick_ms=" << avg_tick << "\n";
+    std::cerr << "[TIMING] plan_calls=" << plan_call_count_ << "\n";
+    std::cerr << "[TIMING] ticks=" << tick_count_ << "\n";
+    std::cerr << "==========================\n";
 }

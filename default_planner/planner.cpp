@@ -4,52 +4,9 @@
 #include "pibt.h"
 #include "flow.h"
 #include "const.h"
-#include <cstdlib>
-#include <iostream>
-#include <string>
 
 
 namespace DefaultPlanner{
-
-namespace {
-
-std::vector<int> task_route_density_snapshot;
-
-bool planner_debug_enabled()
-{
-    static const bool enabled = []() {
-        const char* value = std::getenv("LORR_PLANNER_DEBUG");
-        if (value == nullptr)
-        {
-            return false;
-        }
-        const std::string flag(value);
-        return flag == "1" || flag == "true" || flag == "TRUE" || flag == "on" || flag == "ON";
-    }();
-    return enabled;
-}
-
-} // namespace
-
-const std::vector<int>& get_task_route_density_snapshot()
-{
-    return task_route_density_snapshot;
-}
-
-static void refresh_task_route_density_snapshot(SharedEnvironment* env);
-
-    static const char* debug_action_to_string(Action action)
-    {
-        switch (action)
-        {
-            case Action::FW: return "FW";
-            case Action::CR: return "CR";
-            case Action::CCR: return "CCR";
-            case Action::W: return "W";
-            case Action::NA: return "NA";
-            default: return "UNKNOWN";
-        }
-    }
 
     //default planner data
     std::vector<int> decision; 
@@ -66,32 +23,6 @@ static void refresh_task_route_density_snapshot(SharedEnvironment* env);
     std::vector<int> dummy_goals;
     TrajLNS trajLNS;
     std::mt19937 mt1;
-
-    static void refresh_task_route_density_snapshot(SharedEnvironment* env)
-    {
-        if (env == nullptr)
-        {
-            task_route_density_snapshot.clear();
-            return;
-        }
-
-        task_route_density_snapshot.assign(env->map.size(), 0);
-        constexpr int kRouteDensityHorizon = 12;
-
-        for (const auto& traj : trajLNS.trajs)
-        {
-            const int limit = std::min(static_cast<int>(traj.size()), kRouteDensityHorizon);
-            for (int step = 0; step < limit; ++step)
-            {
-                const int loc = traj[step];
-                if (loc < 0 || loc >= static_cast<int>(task_route_density_snapshot.size()))
-                {
-                    continue;
-                }
-                task_route_density_snapshot[loc] += (limit - step);
-            }
-        }
-    }
 
     static State rollout_next_state(const State& state, Action action, const SharedEnvironment* env)
     {
@@ -402,17 +333,6 @@ static void refresh_task_route_density_snapshot(SharedEnvironment* env);
         initialize_dummy_goals_if_needed(env);
         setup_multistep_episode_state(env, flow_end_time, local_priority);
         update_guide_paths_once_for_multistep(env, flow_end_time);
-        refresh_task_route_density_snapshot(env);
-
-        const auto after_setup = std::chrono::steady_clock::now();
-        const auto setup_elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(after_setup - episode_start).count();
-        if (planner_debug_enabled())
-        {
-            std::cout << "[DefaultPlanner::plan] timing: time_limit=" << time_limit
-                      << "ms, pibt_time_hint=" << pibt_time
-                      << "ms, flow_budget=" << flow_budget_ms
-                      << "ms, setup_elapsed=" << setup_elapsed_ms << "ms" << std::endl;
-        }
 
         // commit only cross-episode priority update (internal rollout keeps using local_priority only)
         p = local_priority;
@@ -428,55 +348,6 @@ static void refresh_task_route_density_snapshot(SharedEnvironment* env);
             run_multistep_pibt_once(env, local_priority, one_step_actions);
 
             append_actions_and_rollout_states(env, actions, one_step_actions);
-        }
-
-        if (planner_debug_enabled())
-        {
-            std::cout << "[DefaultPlanner::plan] computed actions for "
-                      << env->num_of_agents << " agents over " << num_steps << " steps" << std::endl;
-            for (int aid = 0; aid < env->num_of_agents; aid++){
-                if (aid != 47) continue;
-                int curr_loc = env->curr_states[aid].location;
-                int goal_loc = -1;
-                if (!env->goal_locations[aid].empty()) {
-                    goal_loc = env->goal_locations[aid].front().first;
-                }
-                int assigned_task_id = -1;
-                std::string task_details = "N/A";
-                if (aid < env->curr_task_schedule.size()) {
-                    assigned_task_id = env->curr_task_schedule[aid];
-                    auto it = env->task_pool.find(assigned_task_id);
-                    if (it != env->task_pool.end()) {
-                        const auto& task = it->second;
-                        std::ostringstream oss;
-                        oss << "task_id=" << task.task_id
-                            << ", t_revealed=" << task.t_revealed
-                            << ", t_completed=" << task.t_completed
-                            << ", agent_assigned=" << task.agent_assigned
-                            << ", idx_next_loc=" << task.idx_next_loc
-                            << ", locations=[";
-                        for (size_t i = 0; i < task.locations.size(); ++i) {
-                            oss << task.locations[i];
-                            if (i + 1 < task.locations.size()) oss << ",";
-                        }
-                        oss << "]";
-                        const bool task_finished = (task.idx_next_loc >= static_cast<int>(task.locations.size()));
-                        if (!task_finished) {
-                            oss << ", next_loc=" << task.locations[task.idx_next_loc];
-                        }
-                        task_details = oss.str();
-                    }
-                }
-                std::cout << "  agent " << aid
-                          << ": loc=" << curr_loc
-                          << ", goal=" << goal_loc
-                          << ", assigned_task_id=" << assigned_task_id
-                          << ", task_details=[" << task_details << "]:";
-                for (int step = 0; step < static_cast<int>(actions[aid].size()); step++){
-                    std::cout << (step == 0 ? " " : ", ") << debug_action_to_string(actions[aid][step]);
-                }
-                std::cout << std::endl;
-            }
         }
 
         // restore env state after internal rollout simulation
